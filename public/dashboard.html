@@ -1,123 +1,531 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXORE | Dashboard</title>
+<title>NEXORE Dashboard</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#080d18;color:#fff;min-height:100vh}
-header{height:70px;padding:0 22px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #202b40;background:#0d1423}
-.logo{font-size:23px;font-weight:900;letter-spacing:2px;color:#58a6ff}
-.logout{background:#1b2940;color:#fff;border:1px solid #34445f;padding:10px 15px;border-radius:9px;cursor:pointer}
-main{max-width:900px;margin:35px auto;padding:0 18px}
-.welcome{font-size:27px;margin-bottom:8px}
-.sub{color:#8c9bb2;margin-bottom:28px}
-.card{background:#111c2e;border:1px solid #263650;border-radius:16px;padding:23px;margin-bottom:20px}
-.card h3{font-size:15px;color:#9eb0ca;margin-bottom:13px}
-.username{font-size:24px;font-weight:bold;overflow-wrap:anywhere}
-.status{color:#43d9a3;font-size:13px;margin-top:10px}
-.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
-.info{background:#111c2e;border:1px solid #263650;border-radius:14px;padding:20px}
-.info small{color:#91a2bb}
-.info p{font-size:17px;margin-top:10px;overflow-wrap:anywhere}
-.loading{color:#9eb0ca;text-align:center;padding:30px}
-.error{color:#ff7777;margin-top:15px}
-@media(max-width:550px){.grid{grid-template-columns:1fr}main{margin-top:25px}.welcome{font-size:23px}}
+:root{
+  --bg:#080d18;--panel:#111a2b;--panel2:#18243a;
+  --text:#f4f7ff;--muted:#91a0b9;--blue:#718cff;
+  --green:#22d69b;--red:#ff657c;--border:#293650;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.layout{min-height:100vh}
+.sidebar{
+ width:245px;background:#0c1423;border-right:1px solid var(--border);
+ position:fixed;inset:0 auto 0 0;padding:24px 16px;z-index:10
+}
+.logo{font-size:25px;font-weight:900;letter-spacing:2px;margin:8px 10px 35px}
+.logo span{color:var(--blue)}
+.nav button{
+ display:block;width:100%;text-align:left;border:0;background:transparent;
+ color:var(--muted);padding:14px;border-radius:10px;margin:5px 0
+}
+.nav button:hover,.nav button.active{background:#1b2942;color:white}
+.main{margin-left:245px;padding:28px;max-width:1500px}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;gap:15px}
+h1{font-size:25px;margin:0 0 7px}
+h2{font-size:18px;margin:0 0 18px}
+h3{font-size:15px;margin:0 0 10px}
+.muted{color:var(--muted);font-size:13px}
+.user-pill{background:var(--panel);padding:10px 14px;border:1px solid var(--border);border-radius:30px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:22px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:15px;padding:19px;margin-bottom:18px}
+.stat-label{color:var(--muted);font-size:13px}
+.stat-value{font-size:25px;font-weight:800;margin-top:12px;overflow-wrap:anywhere}
+.stat-icon{font-size:20px;margin-bottom:13px}
+.section{display:none}
+.section.active{display:block}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+input,select{
+ width:100%;padding:13px;background:#0b1423;color:white;
+ border:1px solid var(--border);border-radius:9px;margin:7px 0 14px;outline:none
+}
+input:focus,select:focus{border-color:var(--blue)}
+label{font-size:13px;color:var(--muted)}
+.primary{
+ border:0;background:var(--blue);color:white;padding:12px 17px;
+ border-radius:9px;font-weight:700
+}
+.secondary{border:1px solid var(--border);background:var(--panel2);color:white;padding:10px 14px;border-radius:9px}
+.danger{background:#44202c;color:#ff9aaa;border:0;padding:9px 12px;border-radius:8px}
+.success{background:#12382f;color:#7ff0c6;border:0;padding:9px 12px;border-radius:8px}
+.copyrow{display:flex;gap:8px}
+.copyrow input{margin:0}
+table{width:100%;border-collapse:collapse;min-width:600px}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid var(--border);font-size:13px}
+th{color:var(--muted);font-weight:600}
+.table-wrap{overflow-x:auto}
+.status{padding:5px 9px;border-radius:20px;font-size:11px;background:#26334b;display:inline-block}
+.status.approved{color:var(--green);background:#12382f}
+.status.pending{color:#ffd27c;background:#3c301c}
+.status.rejected{color:#ff9aaa;background:#44202c}
+.message{margin:12px 0;padding:12px;border-radius:9px;font-size:13px;display:none}
+.message.show{display:block}
+.message.ok{background:#12382f;color:#7ff0c6}
+.message.bad{background:#44202c;color:#ff9aaa}
+.profile-line{padding:13px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:15px;font-size:13px}
+.admin-tag{color:#aabaff;background:#26365f;padding:5px 8px;border-radius:20px;font-size:11px}
+.mobile-head{display:none}
+.empty{color:var(--muted);padding:20px;text-align:center;font-size:13px}
+@media(max-width:900px){
+ .sidebar{width:100%;height:auto;position:relative;border-right:0;border-bottom:1px solid var(--border);padding:12px}
+ .logo{margin:5px 8px 12px}
+ .nav{display:flex;overflow-x:auto;gap:5px}
+ .nav button{white-space:nowrap;width:auto;margin:0;padding:11px}
+ .main{margin:0;padding:18px}
+ .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .two-col{grid-template-columns:1fr}
+}
+@media(max-width:420px){
+ .grid{gap:9px}
+ .card{padding:14px}
+ .stat-value{font-size:20px}
+ .main{padding:13px}
+}
 </style>
 </head>
 <body>
-<header>
-<div class="logo">NEXORE</div>
-<button class="logout" id="logoutBtn">Logout</button>
-</header>
 
-<main>
-<div class="welcome">Welcome to NEXORE 👋</div>
-<div class="sub">Your personal dashboard</div>
+<div class="layout">
+ <aside class="sidebar">
+  <div class="logo">NEXO<span>RE</span></div>
+  <nav class="nav">
+   <button class="active" data-page="home">🏠 Dashboard</button>
+   <button data-page="referrals">👥 My Referrals</button>
+   <button data-page="earnings">💰 My Earnings</button>
+   <button data-page="withdraw">💸 Withdraw Funds</button>
+   <button data-page="history">📜 Withdrawal History</button>
+   <button data-page="profile">👤 My Profile</button>
+   <button id="adminNav" data-page="admin" style="display:none">🛡️ Admin Panel</button>
+   <button id="logoutBtn">🚪 Logout</button>
+  </nav>
+ </aside>
 
-<div class="card">
-<h3>ACCOUNT PROFILE</h3>
-<div class="username" id="username">Loading...</div>
-<div class="status">● Account connected</div>
-</div>
+ <main class="main">
+  <header class="topbar">
+   <div>
+    <h1 id="pageTitle">Dashboard</h1>
+    <div class="muted">Welcome to your NEXORE account</div>
+   </div>
+   <div class="user-pill" id="userPill">Loading account...</div>
+  </header>
 
-<div class="grid">
-<div class="info">
-<small>Username</small>
-<p id="userNameInfo">Loading...</p>
-</div>
-<div class="info">
-<small>Email address</small>
-<p id="emailInfo">Loading...</p>
-</div>
-<div class="info">
-<small>Account status</small>
-<p>Active</p>
-</div>
-<div class="info">
-<small>Platform</small>
-<p>NEXORE</p>
-</div>
-</div>
+  <div id="notice" class="message"></div>
 
-<div class="error" id="error"></div>
-</main>
+  <section class="section active" id="home">
+   <div class="grid">
+    <div class="card">
+     <div class="stat-icon">👥</div>
+     <div class="stat-label">Total Referrals</div>
+     <div class="stat-value" id="refCount">0</div>
+    </div>
+    <div class="card">
+     <div class="stat-icon">💰</div>
+     <div class="stat-label">Total Earnings</div>
+     <div class="stat-value" id="totalEarn">₦0.00</div>
+    </div>
+    <div class="card">
+     <div class="stat-icon">💳</div>
+     <div class="stat-label">Available Balance</div>
+     <div class="stat-value" id="balance">₦0.00</div>
+    </div>
+    <div class="card">
+     <div class="stat-icon">⏳</div>
+     <div class="stat-label">Pending Withdrawals</div>
+     <div class="stat-value" id="pending">₦0.00</div>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>Your Referral Link</h2>
+    <p class="muted">Share your personal link. Earn ₦50 for every successful referral registration.</p>
+    <div class="copyrow">
+     <input id="refLink" readonly placeholder="Loading your referral link...">
+     <button class="primary" id="copyBtn">Copy</button>
+    </div>
+    <p class="muted">Referral reward: ₦50 per successful registration.</p>
+   </div>
+
+   <div class="two-col">
+    <div class="card">
+     <h2>Quick Actions</h2>
+     <button class="primary" onclick="showPage('withdraw')">Request Withdrawal</button>
+     <button class="secondary" onclick="showPage('referrals')">View Referrals</button>
+    </div>
+    <div class="card">
+     <h2>Account Information</h2>
+     <div class="profile-line"><span>Username</span><strong id="homeUsername">-</strong></div>
+     <div class="profile-line"><span>Account ID</span><strong id="homeId">-</strong></div>
+     <div class="profile-line"><span>Account type</span><strong id="homeRole">Member</strong></div>
+    </div>
+   </div>
+  </section>
+
+  <section class="section" id="referrals">
+   <div class="card">
+    <h2>My Referrals</h2>
+    <p class="muted">People who registered using your referral link.</p>
+    <div class="table-wrap">
+     <table>
+      <thead><tr><th>ID</th><th>Username</th><th>Commission</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody id="refTable"><tr><td colspan="5">Loading...</td></tr></tbody>
+     </table>
+    </div>
+   </div>
+  </section>
+
+  <section class="section" id="earnings">
+   <div class="grid">
+    <div class="card">
+     <div class="stat-label">Total Earnings</div>
+     <div class="stat-value" id="earnTotal">₦0.00</div>
+    </div>
+    <div class="card">
+     <div class="stat-label">Available Balance</div>
+     <div class="stat-value" id="earnBalance">₦0.00</div>
+    </div>
+   </div>
+   <div class="card">
+    <h2>How You Earn</h2>
+    <p class="muted">You receive ₦50 when a new user completes registration through your referral link. Each referred account is credited only once.</p>
+   </div>
+  </section>
+
+  <section class="section" id="withdraw">
+   <div class="card" style="max-width:600px">
+    <h2>Request Withdrawal</h2>
+    <p class="muted">Minimum withdrawal: ₦1,000. Requests are reviewed by the admin.</p>
+    <form id="withdrawForm">
+     <label>Amount (₦)</label>
+     <input type="number" id="withdrawAmount" min="1000" step="1" placeholder="Enter amount" required>
+     <label>Payment Network</label>
+     <select id="network" required>
+      <option value="">Select payment network</option>
+      <option value="Bank Transfer">Bank Transfer</option>
+      <option value="OPay">OPay</option>
+      <option value="PalmPay">PalmPay</option>
+      <option value="Moniepoint">Moniepoint</option>
+      <option value="USDT">USDT</option>
+      <option value="TON">TON</option>
+      <option value="Other">Other</option>
+     </select>
+     <label>Account Number / Wallet Address</label>
+     <input id="wallet" maxlength="200" placeholder="Enter payment details" required>
+     <button class="primary" type="submit" id="withdrawSubmit">Submit Withdrawal</button>
+    </form>
+   </div>
+  </section>
+
+  <section class="section" id="history">
+   <div class="card">
+    <h2>Withdrawal History</h2>
+    <div class="table-wrap">
+     <table>
+      <thead><tr><th>ID</th><th>Amount</th><th>Network</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody id="withdrawTable"><tr><td colspan="5">Loading...</td></tr></tbody>
+     </table>
+    </div>
+   </div>
+  </section>
+
+  <section class="section" id="profile">
+   <div class="card" style="max-width:650px">
+    <h2>My Profile</h2>
+    <div class="profile-line"><span>Account ID</span><strong id="profileId">-</strong></div>
+    <div class="profile-line"><span>Username</span><strong id="profileUsername">-</strong></div>
+    <div class="profile-line"><span>Email</span><strong id="profileEmail">-</strong></div>
+    <div class="profile-line"><span>Account Role</span><strong id="profileRole">Member</strong></div>
+    <div class="profile-line"><span>Referral Code</span><strong id="profileCode">-</strong></div>
+    <div class="profile-line"><span>Registration Date</span><strong id="profileDate">-</strong></div>
+   </div>
+  </section>
+
+  <section class="section" id="admin">
+   <div class="grid">
+    <div class="card"><div class="stat-label">Total Users</div><div class="stat-value" id="adminUsers">0</div></div>
+    <div class="card"><div class="stat-label">Total Referrals</div><div class="stat-value" id="adminRefs">0</div></div>
+    <div class="card"><div class="stat-label">Referral Commissions</div><div class="stat-value" id="adminCommissions">₦0</div></div>
+    <div class="card"><div class="stat-label">Pending Withdrawals</div><div class="stat-value" id="adminPending">0</div></div>
+   </div>
+
+   <div class="card">
+    <h2>Primary Admin Account</h2>
+    <div id="adminAccount" class="muted">Loading admin account...</div>
+   </div>
+
+   <div class="card">
+    <h2>Manage Users</h2>
+    <div class="table-wrap">
+     <table>
+      <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Balance</th><th>Role</th><th>Action</th></tr></thead>
+      <tbody id="adminUserTable"></tbody>
+     </table>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>Manage Withdrawals</h2>
+    <div class="table-wrap">
+     <table>
+      <thead><tr><th>ID</th><th>User</th><th>Amount</th><th>Network</th><th>Payment Details</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody id="adminWithdrawTable"></tbody>
+     </table>
+    </div>
+   </div>
+
+   <div class="card">
+    <h2>All Referrals</h2>
+    <div class="table-wrap">
+     <table>
+      <thead><tr><th>ID</th><th>Referrer</th><th>Referred User</th><th>Commission</th><th>Status</th></tr></thead>
+      <tbody id="adminRefTable"></tbody>
+     </table>
+    </div>
+   </div>
+  </section>
+ </main>
+</div>
 
 <script>
-async function loadDashboard(){
- const error=document.getElementById("error");
- try{
-  const response=await fetch("/api/me",{
-   method:"GET",
-   credentials:"same-origin",
-   headers:{"Accept":"application/json"}
-  });
+let dashboardData = null;
+let currentUser = null;
+let adminLoaded = false;
 
-  const result=await response.json();
+const money = value => "₦" + Number(value || 0).toLocaleString("en-NG", {
+ minimumFractionDigits:2, maximumFractionDigits:2
+});
 
-  if(!response.ok || !result.success){
-   window.location.replace("/");
-   return;
-  }
+const dateText = value => value ? new Date(value).toLocaleString() : "-";
 
-  const user=result.user || result;
-  const username=user.username || "User";
-  const email=user.email || "Not available";
-
-  document.getElementById("username").textContent=username;
-  document.getElementById("userNameInfo").textContent=username;
-  document.getElementById("emailInfo").textContent=email;
-
- }catch(e){
-  error.textContent="Could not load your account. Please refresh the page.";
- }
+function showMessage(message, type="ok") {
+ const box = document.getElementById("notice");
+ box.textContent = message;
+ box.className = "message show " + type;
+ window.scrollTo({top:0,behavior:"smooth"});
+ setTimeout(() => box.classList.remove("show"), 5000);
 }
 
-document.getElementById("logoutBtn").addEventListener("click",async()=>{
- const button=document.getElementById("logoutBtn");
- button.disabled=true;
- button.textContent="Logging out...";
- try{
-  const response=await fetch("/api/logout",{
-   method:"POST",
-   credentials:"same-origin"
-  });
-  if(response.ok){
-   window.location.replace("/");
-  }else{
-   button.disabled=false;
-   button.textContent="Logout";
-   alert("Logout failed. Please try again.");
+async function api(url, options={}) {
+ const response = await fetch(url, {
+  credentials:"same-origin",
+  ...options,
+  headers:{
+   "Content-Type":"application/json",
+   ...(options.headers || {})
   }
- }catch(e){
-  button.disabled=false;
-  button.textContent="Logout";
-  alert("Connection error. Please try again.");
+ });
+
+ let data;
+ try { data = await response.json(); }
+ catch { throw new Error("Unexpected server response"); }
+
+ if (!response.ok || data.success === false) {
+  if (response.status === 401) {
+   window.location.href = "/";
+  }
+  throw new Error(data.message || "Request failed");
+ }
+ return data;
+}
+
+function showPage(page) {
+ if (page === "admin" && (!currentUser || currentUser.role !== "admin")) {
+  showMessage("You are not authorized to access the admin panel.", "bad");
+  return;
+ }
+
+ document.querySelectorAll(".section").forEach(el => el.classList.remove("active"));
+ document.querySelectorAll(".nav button[data-page]").forEach(el => el.classList.remove("active"));
+
+ const section = document.getElementById(page);
+ if (!section) return;
+ section.classList.add("active");
+
+ const nav = document.querySelector(`.nav button[data-page="${page}"]`);
+ if (nav) nav.classList.add("active");
+
+ const titles = {
+  home:"Dashboard", referrals:"My Referrals", earnings:"My Earnings",
+  withdraw:"Withdraw Funds", history:"Withdrawal History",
+  profile:"My Profile", admin:"Admin Panel"
+ };
+ document.getElementById("pageTitle").textContent = titles[page] || "Dashboard";
+
+ if (page === "admin") loadAdmin();
+}
+
+document.querySelectorAll(".nav button[data-page]").forEach(button => {
+ button.addEventListener("click", () => showPage(button.dataset.page));
+});
+
+function statusBadge(status) {
+ const safe = String(status || "pending").toLowerCase();
+ return `<span class="status ${safe}">${safe}</span>`;
+}
+
+function renderDashboard(data) {
+ dashboardData = data;
+ currentUser = data.user;
+
+ document.getElementById("userPill").textContent = data.user.username;
+ document.getElementById("refCount").textContent = data.stats.referrals;
+ document.getElementById("totalEarn").textContent = money(data.stats.totalEarnings);
+ document.getElementById("balance").textContent = money(data.stats.balance);
+ document.getElementById("pending").textContent = money(data.stats.pendingWithdrawals);
+
+ document.getElementById("earnTotal").textContent = money(data.stats.totalEarnings);
+ document.getElementById("earnBalance").textContent = money(data.stats.balance);
+
+ document.getElementById("refLink").value = data.referralLink;
+
+ document.getElementById("homeUsername").textContent = data.user.username;
+ document.getElementById("homeId").textContent = data.user.id;
+ document.getElementById("homeRole").textContent = data.user.role === "admin" ? "Administrator" : "Member";
+
+ document.getElementById("profileId").textContent = data.user.id;
+ document.getElementById("profileUsername").textContent = data.user.username;
+ document.getElementById("profileEmail").textContent = data.user.email;
+ document.getElementById("profileRole").textContent = data.user.role;
+ document.getElementById("profileCode").textContent = data.user.referral_code;
+ document.getElementById("profileDate").textContent = dateText(data.user.created_at);
+
+ // Only an account whose database role is admin gets the admin menu.
+ const isAdmin = data.user.role === "admin";
+ document.getElementById("adminNav").style.display = isAdmin ? "block" : "none";
+
+ renderReferrals(data.referrals || []);
+ renderWithdrawals(data.withdrawals || []);
+}
+
+function renderReferrals(rows) {
+ const tbody = document.getElementById("refTable");
+ if (!rows.length) {
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">You have no referrals yet.</td></tr>';
+  return;
+ }
+
+ tbody.innerHTML = rows.map(r => `
+  <tr>
+   <td>${r.id}</td>
+   <td>${escapeHTML(r.referred_username)}</td>
+   <td>${money(r.commission)}</td>
+   <td>${statusBadge(r.status)}</td>
+   <td>${dateText(r.created_at)}</td>
+  </tr>
+ `).join("");
+}
+
+function renderWithdrawals(rows) {
+ const tbody = document.getElementById("withdrawTable");
+ if (!rows.length) {
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">No withdrawal requests yet.</td></tr>';
+  return;
+ }
+
+ tbody.innerHTML = rows.map(w => `
+  <tr>
+   <td>${w.id}</td>
+   <td>${money(w.amount)}</td>
+   <td>${escapeHTML(w.network)}</td>
+   <td>${statusBadge(w.status)}</td>
+   <td>${dateText(w.created_at)}</td>
+  </tr>
+ `).join("");
+}
+
+function escapeHTML(value) {
+ return String(value ?? "").replace(/[&<>"']/g, char => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ })[char]);
+}
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+ const link = document.getElementById("refLink").value;
+ if (!link) return showMessage("Referral link is not ready.", "bad");
+
+ try {
+  await navigator.clipboard.writeText(link);
+  showMessage("Referral link copied successfully.");
+ } catch {
+  document.getElementById("refLink").select();
+  showMessage("Select and copy your referral link.", "bad");
  }
 });
 
-loadDashboard();
-</script>
-</body>
-</html>
+document.getElementById("withdrawForm").addEventListener("submit", async event => {
+ event.preventDefault();
+
+ const button = document.getElementById("withdrawSubmit");
+ button.disabled = true;
+ button.textContent = "Submitting...";
+
+ try {
+  const result = await api("/api/withdraw", {
+   method:"POST",
+   body:JSON.stringify({
+    amount:Number(document.getElementById("withdrawAmount").value),
+    network:document.getElementById("network").value,
+    wallet_address:document.getElementById("wallet").value.trim()
+   })
+  });
+
+  showMessage(result.message || "Withdrawal submitted.");
+  event.target.reset();
+  await loadDashboard();
+  showPage("history");
+ } catch (err) {
+  showMessage(err.message, "bad");
+ } finally {
+  button.disabled = false;
+  button.textContent = "Submit Withdrawal";
+ }
+});
+
+async function loadAdmin() {
+ if (!currentUser || currentUser.role !== "admin") return;
+
+ try {
+  const data = await api("/api/admin/overview");
+
+  document.getElementById("adminUsers").textContent = data.totals.users;
+  document.getElementById("adminRefs").textContent = data.totals.referrals;
+  document.getElementById("adminCommissions").textContent = money(data.totals.commissions);
+  document.getElementById("adminPending").textContent = data.totals.pending_withdrawals;
+
+  const admin = data.adminAccount;
+  document.getElementById("adminAccount").innerHTML = admin
+   ? `Admin ID: <strong>${escapeHTML(admin.id)}</strong> &nbsp; | &nbsp; Username: <strong>${escapeHTML(admin.username)}</strong> &nbsp; | &nbsp; Email: <strong>${escapeHTML(admin.email)}</strong>`
+   : "The primary admin account has not registered yet.";
+
+  document.getElementById("adminUserTable").innerHTML = data.users.map(u => `
+   <tr>
+    <td>${u.id}</td>
+    <td>${escapeHTML(u.username)}</td>
+    <td>${escapeHTML(u.email)}</td>
+    <td>${money(u.balance)}</td>
+    <td>${escapeHTML(u.role)}</td>
+    <td>
+     ${u.email.toLowerCase() === "yemisiadeshola57@gmail.com"
+      ? '<span class="admin-tag">Primary Admin</span>'
+      : `<button class="secondary" onclick="changeRole(${Number(u.id)},'${u.role === "admin" ? "user" : "admin"}')">${u.role === "admin" ? "Remove Admin" : "Make Admin"}</button>`}
+    </td>
+   </tr>
+  `).join("") || '<tr><td colspan="6" class="empty">No users found.</td></tr>';
+
+  document.getElementById("adminWithdrawTable").innerHTML = data.withdrawals.map(w => `
+   <tr>
+    <td>${w.id}</td>
+    <td>${escapeHTML(w.username)}<br><span class="muted">${escapeHTML(w.email)}</span></td>
+    <td>${money(w.amount)}</td>
+    <td>${escapeHTML(w.network)}</td>
+    <td>${escapeHTML(w.wallet_address)}</td>
+    <td>${statusBadge(w.status)}</td>
+    <td>
+     ${w.status === "pending" ? `
+      <button class="success" onclick="processWithdrawal(${Number(w.id)},'approve')">Appro
