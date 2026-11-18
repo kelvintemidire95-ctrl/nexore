@@ -1,0 +1,63 @@
+
+# NEXORE
+
+**CONNECT • SHARE • EARN**
+
+NEXORE is an affiliate marketing platform with user registration, referral tracking, campaigns, wallet balances, withdrawal requests and an administrator dashboard.
+
+## Features
+
+- User registration and login
+- Unique referral links
+- Referral tracking
+- Affiliate campaigns
+- NGN wallet
+- Withdrawal requests
+- Transaction history
+- Admin dashboard
+- Manual commission approval
+- PostgreSQL database
+
+## Requirements
+
+- Node.js 20+
+- PostgreSQL database
+
+## Install
+
+```bash
+npm install
+npm start
+```
+
+## Environment Variables
+
+Configure these in your hosting dashboard:
+
+```env
+DATABASE_URL=YOUR_POSTGRES_INTERNAL_DATABASE_URL
+SESSION_SECRET=YOUR_LONG_RANDOM_SECRET
+ADMIN_EMAIL=YOUR_ADMIN_EMAIL
+ADMIN_PASSWORD=YOUR_STRONG_ADMIN_PASSWORD
+NODE_ENV=production
+```
+
+## Render Deployment
+
+1. Create a new Web Service on Render.
+2. Connect the GitHub repository.
+3. Select Node as the runtime.
+4. Set the build command to `npm install`.
+5. Set the start command to `npm start`.
+6. Add the environment variables above.
+7. Deploy.
+
+## Health Check
+
+`/health`
+
+## Important
+
+Commissions are credited manually by the administrator after verifying eligible activity. Withdrawal requests require administrator review and actual payment outside this application.
+
+Never publish database credentials or administrator passwords.
