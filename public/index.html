@@ -4,168 +4,280 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NEXORE — Welcome</title>
+<title>NEXORE | Welcome</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,sans-serif;background:#080d19;color:#fff;line-height:1.6}
-header{padding:20px 7%;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #263247}
-.logo{font-size:25px;font-weight:900;letter-spacing:2px}
-.logo span,h1 span{color:#38bdf8}
-nav{display:flex;gap:20px;align-items:center}
-nav a{color:#cbd5e1;text-decoration:none}
-button{border:0;border-radius:8px;padding:13px 20px;background:#38bdf8;color:#06111e;font-weight:bold;cursor:pointer}
-.hero{min-height:550px;padding:90px 7%;display:flex;align-items:center;background:radial-gradient(ellipse at 80% 30%,#12304b,#080d19 60%)}
-.content{max-width:680px}
-.tag{color:#7dd3fc;border:1px solid #24506b;border-radius:30px;padding:7px 15px;display:inline-block;margin-bottom:25px;font-size:12px}
-h1{font-size:clamp(42px,7vw,72px);line-height:1.1;margin-bottom:20px}
-.hero p{color:#aab8ca;margin-bottom:28px;max-width:540px}
-.actions{display:flex;gap:14px;flex-wrap:wrap}
-.secondary{padding:11px 20px;border:1px solid #40516a;border-radius:8px;color:white;text-decoration:none}
-section{padding:70px 7%}
-.heading{text-align:center;margin-bottom:35px}
-.heading p,.card p{color:#94a3b8}
-.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-.card{background:#101a2a;border:1px solid #243247;border-radius:14px;padding:25px}
-.card p{font-size:14px}
-.cta{text-align:center;background:#0d1b2d;border-block:1px solid #1e3047}
-.cta p{color:#94a3b8;margin:12px 0 25px}
-footer{padding:25px 7%;display:flex;justify-content:space-between;color:#8090a5}
-.modal{display:none;position:fixed;inset:0;background:#000c;z-index:5;align-items:center;justify-content:center;padding:20px}
-.modal-box{width:100%;max-width:410px;background:#101a2a;border:1px solid #304158;border-radius:15px;padding:27px}
-.modal-box h2{margin-bottom:15px}
-.modal-box input{display:block;width:100%;padding:14px;margin:12px 0;background:#080d19;border:1px solid #34445a;border-radius:8px;color:white}
-.modal-box button{width:100%;margin-top:8px}
-.close{float:right;width:auto!important;background:none;color:white;font-size:24px;padding:0}
-#message{color:#7dd3fc;font-size:13px;margin-top:12px}
-@media(max-width:700px){header{padding:17px 5%}nav a{display:none}.hero{padding:75px 6%}.cards{grid-template-columns:1fr}section{padding:55px 6%}footer{padding:22px 6%}}
+body{
+font-family:Arial,sans-serif;
+background:#080d19;
+color:#fff;
+min-height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+padding:20px
+}
+.container{
+width:100%;
+max-width:430px;
+text-align:center
+}
+.logo{
+font-size:35px;
+font-weight:900;
+letter-spacing:4px;
+color:#55d6ff;
+margin-bottom:12px
+}
+.subtitle{
+color:#a8b2c5;
+margin-bottom:35px;
+font-size:14px
+}
+.panel{
+background:#111a2c;
+border:1px solid #263750;
+padding:28px 22px;
+border-radius:18px;
+box-shadow:0 15px 50px #0005
+}
+h2{margin-bottom:10px;font-size:24px}
+.description{
+color:#9daac0;
+font-size:14px;
+margin-bottom:25px
+}
+input{
+width:100%;
+padding:15px;
+margin-bottom:14px;
+border:1px solid #30415d;
+border-radius:10px;
+background:#0a1221;
+color:white;
+font-size:15px;
+outline:none
+}
+input:focus{border-color:#55d6ff}
+button{
+width:100%;
+padding:15px;
+border:0;
+border-radius:10px;
+background:#55d6ff;
+color:#07111d;
+font-weight:bold;
+font-size:16px;
+cursor:pointer;
+margin-top:5px
+}
+button:disabled{opacity:.6;cursor:not-allowed}
+.switch{
+margin-top:22px;
+color:#aab8ca;
+font-size:14px
+}
+.switch span{
+color:#55d6ff;
+cursor:pointer;
+font-weight:bold
+}
+.message{
+margin:0 0 15px;
+font-size:14px;
+color:#ff8585;
+line-height:1.5
+}
+.hidden{display:none}
+.footer{
+margin-top:25px;
+color:#64748b;
+font-size:12px
+}
 </style>
 </head>
 <body>
 
-<header>
-<div class="logo">NEX<span>ORE</span></div>
-<nav>
-<a href="#home">Home</a>
-<a href="#features">Features</a>
-<a href="#about">About</a>
-<button onclick="openModal('login')">Sign in</button>
-</nav>
-</header>
+<div class="container">
+  <div class="logo">NEXORE</div>
+  <p class="subtitle">Your account. Your space. Your future.</p>
 
-<main>
-<section class="hero" id="home">
-<div class="content">
-<div class="tag">WELCOME TO NEXORE</div>
-<h1>Make your next move <span>count.</span></h1>
-<p>Discover a smarter digital experience designed to help you manage your next steps with clarity, simplicity and confidence.</p>
-<div class="actions">
-<button onclick="openModal('register')">Get Started</button>
-<a class="secondary" href="#features">Explore NEXORE</a>
-</div>
-</div>
-</section>
+  <div class="panel">
+    <div id="registerBox">
+      <h2>Create Account</h2>
+      <p class="description">Join NEXORE today</p>
 
-<section id="features">
-<div class="heading">
-<h2>Built around your goals</h2>
-<p>A simple and organised experience, all in one place.</p>
-</div>
-<div class="cards">
-<div class="card"><h3>Simple Experience</h3><p>Navigate a clean and easy-to-use platform.</p></div>
-<div class="card"><h3>Your Account</h3><p>Access your personal account securely.</p></div>
-<div class="card"><h3>Move Forward</h3><p>Keep your goals organised in one place.</p></div>
-</div>
-</section>
+      <form id="registerForm">
+        <div class="message" id="registerMessage"></div>
 
-<section class="cta" id="about">
-<h2>Your next chapter starts here.</h2>
-<p>Join NEXORE and get started with your account.</p>
-<button onclick="openModal('register')">Create Account</button>
-</section>
-</main>
+        <input
+          type="text"
+          id="regUsername"
+          placeholder="Username"
+          minlength="3"
+          maxlength="40"
+          autocomplete="username"
+          required
+        >
 
-<footer>
-<div class="logo">NEX<span>ORE</span></div>
-<div>© <span id="year"></span> NEXORE</div>
-</footer>
+        <input
+          type="email"
+          id="regEmail"
+          placeholder="Email address"
+          autocomplete="email"
+          required
+        >
 
-<div class="modal" id="modal">
-<div class="modal-box">
-<button class="close" onclick="closeModal()">×</button>
-<h2 id="modalTitle">Create Account</h2>
+        <input
+          type="password"
+          id="regPassword"
+          placeholder="Password (minimum 6 characters)"
+          minlength="6"
+          autocomplete="new-password"
+          required
+        >
 
-<form id="authForm">
-<input id="username" placeholder="Username" autocomplete="username">
-<input id="email" type="email" placeholder="Email address" required autocomplete="email">
-<input id="password" type="password" placeholder="Password (minimum 8 characters)" required autocomplete="current-password">
-<button id="submitBtn" type="submit">Create Account</button>
-</form>
+        <button type="submit" id="registerButton">
+          Create Account
+        </button>
+      </form>
 
-<p id="message"></p>
-</div>
+      <p class="switch">
+        Already have an account?
+        <span id="showLogin">Login</span>
+      </p>
+    </div>
+
+    <div id="loginBox" class="hidden">
+      <h2>Welcome Back</h2>
+      <p class="description">Login to your NEXORE account</p>
+
+      <form id="loginForm">
+        <div class="message" id="loginMessage"></div>
+
+        <input
+          type="text"
+          id="loginEmail"
+          placeholder="Email or username"
+          autocomplete="username"
+          required
+        >
+
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Password"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit" id="loginButton">
+          Login
+        </button>
+      </form>
+
+      <p class="switch">
+        Don't have an account?
+        <span id="showRegister">Register</span>
+      </p>
+    </div>
+  </div>
+
+  <p class="footer">© 2026 NEXORE. All rights reserved.</p>
 </div>
 
 <script>
-document.getElementById("year").textContent=new Date().getFullYear();
+const registerBox = document.getElementById("registerBox");
+const loginBox = document.getElementById("loginBox");
 
-let mode="register";
-
-function openModal(m){
-mode=m;
-document.getElementById("modal").style.display="flex";
-document.getElementById("modalTitle").textContent=m==="register"?"Create Account":"Welcome Back";
-document.getElementById("submitBtn").textContent=m==="register"?"Create Account":"Sign In";
-document.getElementById("username").style.display=m==="register"?"block":"none";
-document.getElementById("username").required=m==="register";
-document.getElementById("message").textContent="";
+function showLogin() {
+  registerBox.classList.add("hidden");
+  loginBox.classList.remove("hidden");
 }
 
-function closeModal(){
-document.getElementById("modal").style.display="none";
+function showRegister() {
+  loginBox.classList.add("hidden");
+  registerBox.classList.remove("hidden");
 }
 
-document.getElementById("authForm").addEventListener("submit",async function(e){
-e.preventDefault();
+document.getElementById("showLogin").addEventListener("click", showLogin);
+document.getElementById("showRegister").addEventListener("click", showRegister);
 
-const button=document.getElementById("submitBtn");
-const message=document.getElementById("message");
+async function sendRequest(url, data, messageElement, button) {
+  messageElement.textContent = "";
+  button.disabled = true;
+  button.textContent = "Please wait...";
 
-button.disabled=true;
-message.textContent="Please wait...";
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
 
-const data={
-username:document.getElementById("username").value.trim(),
-email:document.getElementById("email").value.trim(),
-password:document.getElementById("password").value
-};
+    const result = await response.json();
 
-try{
-const response=await fetch(
-mode==="register"?"/api/register":"/api/login",
-{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-credentials:"same-origin",
-body:JSON.stringify(data)
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Request failed. Please try again.");
+    }
+
+    if (result.redirect) {
+      window.location.assign(result.redirect);
+      return;
+    }
+
+    throw new Error("Server did not return a redirect.");
+
+  } catch (error) {
+    messageElement.textContent = error.message || "Connection failed. Please try again.";
+    button.disabled = false;
+    button.textContent = url.includes("register") ? "Create Account" : "Login";
+  }
+}
+
+document.getElementById("registerForm").addEventListener("submit", function(e) {
+  e.preventDefault();
+
+  const username = document.getElementById("regUsername").value.trim();
+  const email = document.getElementById("regEmail").value.trim();
+  const password = document.getElementById("regPassword").value;
+
+  sendRequest(
+    "/api/register",
+    { username, email, password },
+    document.getElementById("registerMessage"),
+    document.getElementById("registerButton")
+  );
 });
 
-const result=await response.json();
+document.getElementById("loginForm").addEventListener("submit", function(e) {
+  e.preventDefault();
 
-if(!response.ok){
-throw new Error(result.error||"Request failed");
-}
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
 
-window.location.assign(result.redirect||"/dashboard");
-
-}catch(error){
-message.textContent=error.message;
-button.disabled=false;
-}
+  sendRequest(
+    "/api/login",
+    { email, password },
+    document.getElementById("loginMessage"),
+    document.getElementById("loginButton")
+  );
 });
 
-document.getElementById("modal").addEventListener("click",function(e){
-if(e.target===this)closeModal();
-});
+// Check whether an existing session is active.
+fetch("/api/me", {
+  credentials: "same-origin"
+})
+.then(response => {
+  if (response.ok) {
+    window.location.replace("/dashboard");
+  }
+})
+.catch(error => console.log("Session check:", error));
 </script>
 
 </body>
