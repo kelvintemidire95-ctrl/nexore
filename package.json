@@ -1,0 +1,295 @@
+
+{
+  "name": "nexore",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "connect-pg-simple": "^10.0.0",
+    "pg": "^8.13.1",
+    "bcryptjs": "^2.4.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+    res.redirect("/dashboard");
+  } catch (error) {
+    console.error("Registration error:", error);
+    res.status(500).send(page("Registration error",
+      "<h1>Could not create your account</h1><p>Please try again.</p>"));
+  }
+});
+
+app.get("/login", (req, res) => {
+  if (req.session.user) return res.redirect("/dashboard");
+
+  res.send(page("Login", `
+    <div class="card">
+      <h1>Login to NEXORE</h1>
+      ${req.query.error ? message(req.query.error, "error") : ""}
+      <form method="POST" action="/login">
+        <label>Email address</label>
+        <input type="email" name="email" required>
+        <label>Password</label>
+        <input type="password" name="password" required>
+        <button class="btn" type="submit">Login</button>
+      </form>
+      <p>New here? <a href="/register">Create an account</a></p>
+    </div>
+  `));
+});
+
+app.post("/login", async (req, res) => {
+  try {
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = String(req.body.password || "");
+
+    const result = await pool.query(
+      "SELECT id,name,email,password,is_admin FROM users WHERE email=$1",
+      [email]
+    );
+
+    if (!result.rowCount ||
+        !(await bcrypt.compare(password, result.rows[0].password))) {
+      return res.redirect("/login?error=" +
+        encodeURIComponent("Incorrect email or password."));
+    }
+
+    const user = result.rows[0];
+    delete user.password;
+    req.session.regenerate(error => {
+      if (error) return res.status(500).send("Session error");
+      req.session.user = user;
+      res.redirect("/dashboard");
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).send("Login failed. Please try again.");
+  }
+});
+
+app.get("/logout", (req, res) => {
+  req.session.destroy(() => res.redirect("/"));
+});
+
+app.get("/dashboard", requireAuth, async (req, res) => {
+  const userId = req.session.user.id;
+
+  const [userResult, referralResult, commissionResult, withdrawalResult] =
+    await Promise.all([
+      pool.query("SELECT * FROM users WHERE id=$1", [userId]),
+      pool.query("SELECT COUNT(*) FROM users WHERE referred_by=$1", [userId]),
+      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM commissions WHERE user_id=$1 AND status='approved'", [userId]),
+      pool.query("SELECT COUNT(*) FROM withdrawals WHERE user_id=$1 AND status='pending'", [userId])
+    ]);
+
+  const user = userResult.rows[0];
+  const referralCount = referralResult.rows[0].count;
+  const totalCommission = commissionResult.rows[0].total;
+  const pendingWithdrawals = withdrawalResult.rows[0].count;
+  const referralLink = `${req.protocol}://${req.get("host")}/register?ref=${user.referral_code}`;
+
+  res.send(page("Dashboard", `
+    <h1>Welcome, ${escapeHTML(user.name)}</h1>
+    <div class="grid">
+      <div class="card"><p>Available Balance</p><div class="stat">${money(user.balance)}</div></div>
+      <div class="card"><p>Total Referrals</p><div class="stat">${referralCount}</div></div>
+      <div class="card"><p>Approved Commissions</p><div class="stat">${money(totalCommission)}</div></div>
+      <div class="card"><p>Pending Withdrawals</p><div class="stat">${pendingWithdrawals}</div></div>
+    </div>
+    <div class="card">
+      <h2>Your Referral Link</h2>
+      <input id="refLink" readonly value="${escapeHTML(referralLink)}">
+      <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('refLink').value).then(()=>alert('Referral link copied'))">Copy Link</button>
+      <p class="small">Share this link. Referrals do not automatically generate commissions; eligible activity must be reviewed and approved.</p>
+    </div>
+    <div class="grid">
+      <a class="btn" href="/campaigns">View Campaigns</a>
+      <a class="btn secondary" href="/wallet">My Wallet</a>
+      <a class="btn secondary" href="/history">Transaction History</a>
+      ${user.is_admin ? '<a class="btn secondary" href="/admin">Admin Panel</a>' : ""}
+    </div>
+  `, user));
+});
+
+app.get("/campaigns", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    "SELECT * FROM campaigns WHERE active=TRUE ORDER BY created_at DESC"
+  );
+
+  const cards = result.rows.map(c => `
+    <div class="card">
+      <h2>${escapeHTML(c.title)}</h2>
+      <p>${escapeHTML(c.description)}</p>
+      <div class="stat">${money(c.commission)}</div>
+      <p class="small">Advertised commission per eligible approved conversion. Terms apply.</p>
+    </div>
+  `).join("");
+
+  res.send(page("Campaigns", `
+    <h1>Affiliate Campaigns</h1>
+    ${cards || "<p>No active campaigns are available right now.</p>"}
+  `, req.session.user));
+});
+
+app.get("/wallet", requireAuth, async (req, res) => {
+  const result = await pool.query(
+    "SELECT balance FROM users WHERE id=$1",
+    [req.session.user.id]
+  );
+
+  res.send(page("Wallet", `
+    <h1>My Wallet</h1>
+    <div class="card">
+      <p>Available Balance</p>
+      <div class="stat">${money(result.rows[0].balance)}</div>
+    </div>
+    ${req.query.error ? message(req.query.error, "error") : ""}
+    ${req.query.success ? message(req.query.success) : ""}
+    <div class="card">
+      <h2>Request Withdrawal</h2>
+      <p>Minimum withdrawal: ${money(1000)}</p>
+      <form method="POST" action="/withdraw">
+        <label>Amount (NGN)</label>
+        <input type="number" name="amount" min="1000" step="0.01" required>
+        <label>Payment method</label>
+        <select name="method" required>
+          <option value="">Choose method</option>
+          <option value="Bank Transfer">Bank Transfer</option>
+        </select>
+        <label>Bank name, account name and account number</label>
+        <textarea name="details" required maxlength="500" placeholder="Enter your bank details"></textarea>
+        <button class="btn" type="submit">Submit Request</button>
+      </form>
+    </div>
+    <a href="/history">View transaction history</a>
+  `, req.session.user));
+});
+
+app.post("/withdraw", requireAuth, async (req, res) => {
+  const amount = Number(req.body.amount);
+  const method = String(req.body.method || "").trim();
+  const details = String(req.body.details || "").trim();
+  const userId = req.session.user.id;
+
+  if (!Number.isFinite(amount) || amount < 1000 ||
+      !method || !details || details.length > 500) {
+    return res.redirect("/wallet?error=" +
+      encodeURIComponent("Check your withdrawal details. Minimum withdrawal is ₦1,000."));
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      "SELECT balance FROM users WHERE id=$1 FOR UPDATE",
+      [userId]
+    );
+
+    if (!result.rowCount || Number(result.rows[0].balance) < amount) {
+      await client.query("ROLLBACK");
+      return res.redirect("/wallet?error=" +
+        encodeURIComponent("Insufficient available balance."));
+    }
+
+    await client.query(
+      "UPDATE users SET balance=balance-$1 WHERE id=$2",
+      [amount, userId]
+    );
+
+    await client.query(
+      `INSERT INTO withdrawals(user_id,amount,method,account_details)
+       VALUES($1,$2,$3,$4)`,
+      [userId, amount, method, details]
+    );
+
+    await client.query("COMMIT");
+    res.redirect("/wallet?success=" +
+      encodeURIComponent("Withdrawal request submitted for admin review."));
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Withdrawal error:", error);
+    res.status(500).send("Could not submit withdrawal.");
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/history", requireAuth, async (req, res) => {
+  const userId = req.session.user.id;
+
+  const [commissions, withdrawals] = await Promise.all([
+    pool.query(
+      "SELECT amount,description,status,created_at FROM commissions WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50",
+      [userId]
+    ),
+    pool.query(
+      "SELECT amount,method,status,created_at FROM withdrawals WHERE user_id=$1 ORDER BY created_at DESC LIMIT 50",
+      [userId]
+    )
+  ]);
+
+  const commissionRows = commissions.rows.map(item => `
+    <tr>
+      <td>Commission</td>
+      <td>${money(item.amount)}</td>
+      <td>${escapeHTML(item.description)}</td>
+      <td>${escapeHTML(item.status)}</td>
+      <td>${new Date(item.created_at).toLocaleDateString()}</td>
+    </tr>
+  `).join("");
+
+  const withdrawalRows = withdrawals.rows.map(item => `
+    <tr>
+      <td>Withdrawal</td>
+      <td>${money(item.amount)}</td>
+      <td>${escapeHTML(item.method)}</td>
+      <td>${escapeHTML(item.status)}</td>
+      <td>${new Date(item.created_at).toLocaleDateString()}</td>
+    </tr>
+  `).join("");
+
+  res.send(page("History", `
+    <h1>Transaction History</h1>
+    <div class="card table-wrap">
+      <table>
+        <tr><th>Type</th><th>Amount</th><th>Description</th><th>Status</th><th>Date</th></tr>
+        ${commissionRows}${withdrawalRows}
+      </table>
+      ${!commissionRows && !withdrawalRows ? "<p>No transactions yet.</p>" : ""}
+    </div>
+  `, req.session.user));
+});
+
+app.get("/admin", requireAuth, requireAdmin, async (req, res) => {
+  const [users, campaigns, withdrawals] = await Promise.all([
+    pool.query("SELECT id,name,email,balance,referral_code,created_at FROM users ORDER BY created_at DESC LIMIT 100"),
+    pool.query("SELECT * FROM campaigns ORDER BY created_at DESC"),
+    pool.query(
+      `SELECT w.*,u.name,u.email FROM withdrawals w
+       JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC LIMIT 100`
+    )
+  ]);
+
+  const userRows = users.rows.map(u => `
+    <tr>
+      <td>${u.id}</td><td>${escapeHTML(u.name)}</td>
+      <td>${escapeHTML(u.email)}</td><td>${money(u.balance)}</td>
+      <td>${escapeHTML(u.referral_code)}</td>
+    </tr>
+  `).join("");
+
+  const campaignRows = campaigns.rows.map(c => `
+    <tr>
+      <td>${c.id}</td><td>${escapeHTML(c.title)}</td>
+      <td>${money(c.commission)}</td><td>${c.active ? "Active" : "Inactive"}</td>
+      <td>
+        <form method="POST" action="/admin/campaign-toggle">
+          <input type="hidden" name="id" value="${c.id}
