@@ -1,4 +1,5 @@
 
+
 const express = require("express");
 const session = require("express-session");
 const PgSession = require("connect-pg-simple")(session);
@@ -15,8 +16,13 @@ const REFERRAL_REWARD = 50;
 const MIN_WITHDRAWAL = 1000;
 const SESSION_TABLE = "nexore_sessions";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is missing");
-if (!process.env.SESSION_SECRET) throw new Error("SESSION_SECRET is missing");
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is missing");
+}
+
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET is missing");
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -54,7 +60,10 @@ function makeReferralCode() {
 }
 
 function error(res, status, message) {
-  return res.status(status).json({ success: false, message });
+  return res.status(status).json({
+    success: false,
+    message
+  });
 }
 
 function saveSession(req) {
@@ -71,18 +80,34 @@ function destroySession(req) {
 
 function getReferralCookie(req) {
   const cookies = String(req.headers.cookie || "").split(";");
-  const item = cookies.find(x => x.trim().startsWith("nexore_ref="));
-  return item ? decodeURIComponent(item.trim().slice("nexore_ref=".length)) : "";
+  const item = cookies.find(x =>
+    x.trim().startsWith("nexore_ref=")
+  );
+
+  if (!item) return "";
+
+  try {
+    return decodeURIComponent(
+      item.trim().slice("nexore_ref=".length)
+    );
+  } catch (_) {
+    return "";
+  }
 }
 
 function requireLogin(req, res, next) {
-  if (!req.session.userId) return error(res, 401, "Please log in first");
+  if (!req.session.userId) {
+    return error(res, 401, "Please log in first");
+  }
+
   next();
 }
 
 async function requireAdmin(req, res, next) {
   try {
-    if (!req.session.userId) return error(res, 401, "Please log in first");
+    if (!req.session.userId) {
+      return error(res, 401, "Please log in first");
+    }
 
     const result = await pool.query(
       "SELECT role FROM users WHERE id = $1",
@@ -96,7 +121,7 @@ async function requireAdmin(req, res, next) {
     next();
   } catch (err) {
     console.error("ADMIN CHECK:", err);
-    error(res, 500, "Could not verify admin access");
+    return error(res, 500, "Could not verify admin access");
   }
 }
 
@@ -134,13 +159,16 @@ async function initDB() {
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS total_earnings NUMERIC(14,2) NOT NULL DEFAULT 0"
   ];
 
-  for (const sql of migrations) await pool.query(sql);
+  for (const sql of migrations) {
+    await pool.query(sql);
+  }
 
   await pool.query(`
     DO $$
     BEGIN
       IF EXISTS (
-        SELECT 1 FROM information_schema.columns
+        SELECT 1
+        FROM information_schema.columns
         WHERE table_schema = 'public'
           AND table_name = 'users'
           AND column_name = 'password'
@@ -151,9 +179,10 @@ async function initDB() {
     $$;
   `);
 
-  const oldUsers = await pool.query(
-    "SELECT id FROM users WHERE referral_code IS NULL OR referral_code = ''"
-  );
+  const oldUsers = await pool.query(`
+    SELECT id FROM users
+    WHERE referral_code IS NULL OR referral_code = ''
+  `);
 
   for (const user of oldUsers.rows) {
     let code;
@@ -161,10 +190,12 @@ async function initDB() {
 
     while (exists) {
       code = makeReferralCode();
+
       const check = await pool.query(
         "SELECT id FROM users WHERE referral_code = $1",
         [code]
       );
+
       exists = check.rows.length > 0;
     }
 
@@ -214,14 +245,16 @@ async function initDB() {
     ON withdrawals(user_id)
   `);
 
-  // Promote the intended admin if the account already exists.
+  // Promote the configured admin account if it already exists.
   await pool.query(
     "UPDATE users SET role = 'admin' WHERE LOWER(email) = LOWER($1)",
     [ADMIN_EMAIL]
   );
 
   const admin = await pool.query(
-    "SELECT id, username, email, role FROM users WHERE LOWER(email) = LOWER($1)",
+    `SELECT id, username, email, role
+     FROM users
+     WHERE LOWER(email) = LOWER($1)`,
     [ADMIN_EMAIL]
   );
 
@@ -234,34 +267,43 @@ async function initDB() {
   console.log("NEXORE database ready");
 }
 
-// Save referral code when someone opens a referral link.
-// Example: https://nexore.onrender.com/?ref=ABC123
+// Remember referral codes from referral links.
 app.use((req, res, next) => {
   const ref = String(req.query.ref || "").trim().toUpperCase();
 
   if (ref && /^[A-Z0-9]{5,30}$/.test(ref)) {
-    res.setHeader(
-      "Set-Cookie",
-      `nexore_ref=${encodeURIComponent(ref)}; Max-Age=2592000; Path=/; SameSite=Lax; Secure`
-    );
+    res.cookie("nexore_ref", ref, {
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/"
+    });
   }
+
   next();
 });
 
+// Home page
 app.get("/", (req, res) => {
-  if (req.session.userId) return res.redirect("/dashboard");
+  if (req.session.userId) {
+    return res.redirect("/dashboard");
+  }
+
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Dashboard page
 app.get("/dashboard", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "dashboard.html"));
 });
 
+// Current logged-in user
 app.get("/api/me", requireLogin, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, username, email, role, referral_code, balance,
-              total_earnings, created_at
+      `SELECT id, username, email, role, referral_code,
+              balance, total_earnings, created_at
        FROM users WHERE id = $1`,
       [req.session.userId]
     );
@@ -271,13 +313,17 @@ app.get("/api/me", requireLogin, async (req, res) => {
       return error(res, 401, "Account not found");
     }
 
-    res.json({ success: true, user: result.rows[0] });
+    res.json({
+      success: true,
+      user: result.rows[0]
+    });
   } catch (err) {
     console.error("PROFILE ERROR:", err);
     error(res, 500, "Could not load profile");
   }
 });
 
+// Register
 app.post("/api/register", async (req, res) => {
   const client = await pool.connect();
 
@@ -303,6 +349,7 @@ app.post("/api/register", async (req, res) => {
     }
 
     const passwordHash = await bcrypt.hash(password, 12);
+
     await client.query("BEGIN");
 
     const duplicate = await client.query(
@@ -323,10 +370,12 @@ app.post("/api/register", async (req, res) => {
 
     while (codeExists) {
       referralCode = makeReferralCode();
+
       const check = await client.query(
         "SELECT id FROM users WHERE referral_code = $1",
         [referralCode]
       );
+
       codeExists = check.rows.length > 0;
     }
 
@@ -338,7 +387,10 @@ app.post("/api/register", async (req, res) => {
         "SELECT id FROM users WHERE referral_code = $1",
         [refCode]
       );
-      if (referrer.rows.length) referrerId = referrer.rows[0].id;
+
+      if (referrer.rows.length) {
+        referrerId = referrer.rows[0].id;
+      }
     }
 
     const role = email === ADMIN_EMAIL ? "admin" : "user";
@@ -347,8 +399,8 @@ app.post("/api/register", async (req, res) => {
       `INSERT INTO users
        (username, email, password_hash, referral_code, referred_by, role)
        VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, username, email, role, referral_code, balance,
-                 total_earnings, created_at`,
+       RETURNING id, username, email, role, referral_code,
+                 balance, total_earnings, created_at`,
       [username, email, passwordHash, referralCode, referrerId, role]
     );
 
@@ -383,10 +435,12 @@ app.post("/api/register", async (req, res) => {
       return error(res, 500, "Account created. Please log in.");
     }
 
-    res.setHeader(
-      "Set-Cookie",
-      "nexore_ref=; Max-Age=0; Path=/; SameSite=Lax; Secure"
-    );
+    res.clearCookie("nexore_ref", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/"
+    });
 
     res.status(201).json({
       success: true,
@@ -395,7 +449,10 @@ app.post("/api/register", async (req, res) => {
       user
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) {}
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+
     console.error("REGISTRATION ERROR:", err);
 
     if (err.code === "23505") {
@@ -408,13 +465,21 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
+// Login
 app.post("/api/login", async (req, res) => {
   try {
-    const login = String(req.body.email || req.body.username || "").trim();
+    const login = String(
+      req.body.email || req.body.username || ""
+    ).trim();
+
     const password = String(req.body.password || "");
 
     if (!login || !password) {
-      return error(res, 400, "Email/username and password are required");
+      return error(
+        res,
+        400,
+        "Email/username and password are required"
+      );
     }
 
     const result = await pool.query(
@@ -432,8 +497,10 @@ app.post("/api/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    if (!user.password_hash ||
-        !(await bcrypt.compare(password, user.password_hash))) {
+    if (
+      !user.password_hash ||
+      !(await bcrypt.compare(password, user.password_hash))
+    ) {
       return error(res, 401, "Invalid email/username or password");
     }
 
@@ -451,31 +518,40 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
+// Logout
 app.post("/api/logout", async (req, res) => {
   try {
     await destroySession(req);
+
     res.clearCookie("nexore.sid", {
       httpOnly: true,
       secure: true,
       sameSite: "lax"
     });
-    res.json({ success: true, redirect: "/" });
+
+    res.json({
+      success: true,
+      redirect: "/"
+    });
   } catch (err) {
     console.error("LOGOUT ERROR:", err);
     error(res, 500, "Logout failed");
   }
 });
 
+// User dashboard data
 app.get("/api/dashboard", requireLogin, async (req, res) => {
   try {
     const userResult = await pool.query(
-      `SELECT id, username, email, role, referral_code, balance,
-              total_earnings, created_at
+      `SELECT id, username, email, role, referral_code,
+              balance, total_earnings, created_at
        FROM users WHERE id = $1`,
       [req.session.userId]
     );
 
-    if (!userResult.rows.length) return error(res, 404, "User not found");
+    if (!userResult.rows.length) {
+      return error(res, 404, "User not found");
+    }
 
     const user = userResult.rows[0];
 
@@ -489,15 +565,19 @@ app.get("/api/dashboard", requireLogin, async (req, res) => {
          ORDER BY r.created_at DESC LIMIT 100`,
         [user.id]
       ),
+
       pool.query(
         `SELECT id, amount, wallet_address, network, status,
                 admin_note, created_at, updated_at
-         FROM withdrawals WHERE user_id = $1
+         FROM withdrawals
+         WHERE user_id = $1
          ORDER BY created_at DESC LIMIT 100`,
         [user.id]
       ),
+
       pool.query(
-        "SELECT COUNT(*)::int AS total FROM referrals WHERE referrer_id = $1",
+        `SELECT COUNT(*)::int AS total
+         FROM referrals WHERE referrer_id = $1`,
         [user.id]
       )
     ]);
@@ -527,6 +607,7 @@ app.get("/api/dashboard", requireLogin, async (req, res) => {
   }
 });
 
+// Request withdrawal
 app.post("/api/withdraw", requireLogin, async (req, res) => {
   const client = await pool.connect();
 
@@ -536,13 +617,21 @@ app.post("/api/withdraw", requireLogin, async (req, res) => {
     const network = String(req.body.network || "").trim();
 
     if (!Number.isFinite(amount) || amount < MIN_WITHDRAWAL) {
-      return error(res, 400, `Minimum withdrawal is ₦${MIN_WITHDRAWAL.toLocaleString("en-NG")}`);
+      return error(
+        res,
+        400,
+        `Minimum withdrawal is ₦${MIN_WITHDRAWAL.toLocaleString("en-NG")}`
+      );
     }
 
-    if (amount > 100000000) return error(res, 400, "Invalid withdrawal amount");
+    if (amount > 100000000) {
+      return error(res, 400, "Invalid withdrawal amount");
+    }
+
     if (wallet.length < 5 || wallet.length > 200) {
       return error(res, 400, "Enter a valid wallet or payment account");
     }
+
     if (!network || network.length > 60) {
       return error(res, 400, "Select a payment network");
     }
@@ -585,7 +674,10 @@ app.post("/api/withdraw", requireLogin, async (req, res) => {
       withdrawal: withdrawal.rows[0]
     });
   } catch (err) {
-    try { await client.query("ROLLBACK"); } catch (_) {}
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {}
+
     console.error("WITHDRAW ERROR:", err);
     error(res, 500, "Could not submit withdrawal");
   } finally {
@@ -593,97 +685,94 @@ app.post("/api/withdraw", requireLogin, async (req, res) => {
   }
 });
 
-// Admin overview and user list
-app.get("/api/admin/overview", requireLogin, requireAdmin, async (req, res) => {
-  try {
-    const [users, referrals, withdrawals, totals] = await Promise.all([
-      pool.query(
-        `SELECT id, username, email, role, balance, total_earnings, created_at
-         FROM users ORDER BY created_at DESC LIMIT 200`
-      ),
-      pool.query(
-        `SELECT r.id, r.commission, r.status, r.created_at,
-                a.username AS referrer_username,
-                b.username AS referred_username,
-                a.id AS referrer_id, b.id AS referred_user_id
-         FROM referrals r
-         JOIN users a ON a.id = r.referrer_id
-         JOIN users b ON b.id = r.referred_user_id
-         ORDER BY r.created_at DESC LIMIT 200`
-      ),
-      pool.query(
-        `SELECT w.id, w.user_id, w.amount, w.wallet_address, w.network,
-                w.status, w.admin_note, w.created_at, u.username, u.email
-         FROM withdrawals w JOIN users u ON u.id = w.user_id
-         ORDER BY w.created_at DESC LIMIT 200`
-      ),
-      pool.query(`
-        SELECT
-          (SELECT COUNT(*) FROM users)::int AS users,
-          (SELECT COUNT(*) FROM referrals)::int AS referrals,
-          (SELECT COALESCE(SUM(commission),0) FROM referrals) AS commissions,
-          (SELECT COUNT(*) FROM withdrawals WHERE status = 'pending')::int AS pending_withdrawals
-      `)
-    ]);
+// Admin overview
+app.get(
+  "/api/admin/overview",
+  requireLogin,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const [users, referrals, withdrawals, totals] = await Promise.all([
+        pool.query(
+          `SELECT id, username, email, role, balance,
+                  total_earnings, created_at
+           FROM users
+           ORDER BY created_at DESC LIMIT 200`
+        ),
 
-    const adminAccount = await pool.query(
-      "SELECT id, username, email FROM users WHERE LOWER(email) = LOWER($1)",
-      [ADMIN_EMAIL]
-    );
+        pool.query(
+          `SELECT r.id, r.commission, r.status, r.created_at,
+                  a.username AS referrer_username,
+                  b.username AS referred_username,
+                  a.id AS referrer_id,
+                  b.id AS referred_user_id
+           FROM referrals r
+           JOIN users a ON a.id = r.referrer_id
+           JOIN users b ON b.id = r.referred_user_id
+           ORDER BY r.created_at DESC LIMIT 200`
+        ),
 
-    res.json({
-      success: true,
-      totals: totals.rows[0],
-      adminAccount: adminAccount.rows[0] || null,
-      users: users.rows,
-      referrals: referrals.rows,
-      withdrawals: withdrawals.rows
-    });
-  } catch (err) {
-    console.error("ADMIN OVERVIEW:", err);
-    error(res, 500, "Could not load admin panel");
+        pool.query(
+          `SELECT w.id, w.user_id, w.amount, w.wallet_address,
+                  w.network, w.status, w.admin_note, w.created_at,
+                  u.username, u.email
+           FROM withdrawals w
+           JOIN users u ON u.id = w.user_id
+           ORDER BY w.created_at DESC LIMIT 200`
+        ),
+
+        pool.query(`
+          SELECT
+            (SELECT COUNT(*) FROM users)::int AS users,
+            (SELECT COUNT(*) FROM referrals)::int AS referrals,
+            (SELECT COALESCE(SUM(commission), 0) FROM referrals) AS commissions,
+            (SELECT COUNT(*) FROM withdrawals
+             WHERE status = 'pending')::int AS pending_withdrawals
+        `)
+      ]);
+
+      const adminAccount = await pool.query(
+        `SELECT id, username, email
+         FROM users WHERE LOWER(email) = LOWER($1)`,
+        [ADMIN_EMAIL]
+      );
+
+      res.json({
+        success: true,
+        totals: totals.rows[0],
+        adminAccount: adminAccount.rows[0] || null,
+        users: users.rows,
+        referrals: referrals.rows,
+        withdrawals: withdrawals.rows
+      });
+    } catch (err) {
+      console.error("ADMIN OVERVIEW:", err);
+      error(res, 500, "Could not load admin panel");
+    }
   }
-});
+);
 
-// Approve or reject a withdrawal. Rejected amounts are refunded.
-app.post("/api/admin/withdrawals/:id", requireLogin, requireAdmin, async (req, res) => {
-  const client = await pool.connect();
+// Approve or reject withdrawal
+app.post(
+  "/api/admin/withdrawals/:id",
+  requireLogin,
+  requireAdmin,
+  async (req, res) => {
+    const client = await pool.connect();
 
-  try {
-    const id = Number(req.params.id);
-    const action = String(req.body.action || "").toLowerCase();
-    const note = String(req.body.note || "").trim().slice(0, 500);
+    try {
+      const id = Number(req.params.id);
+      const action = String(req.body.action || "").toLowerCase();
+      const note = String(req.body.note || "").trim().slice(0, 500);
 
-    if (!Number.isSafeInteger(id) || id < 1) return error(res, 400, "Invalid withdrawal ID");
-    if (!["approve", "reject"].includes(action)) return error(res, 400, "Invalid action");
+      if (!Number.isSafeInteger(id) || id < 1) {
+        return error(res, 400, "Invalid withdrawal ID");
+      }
 
-    await client.query("BEGIN");
+      if (!["approve", "reject"].includes(action)) {
+        return error(res, 400, "Invalid action");
+      }
 
-    const found = await client.query(
-      "SELECT * FROM withdrawals WHERE id = $1 FOR UPDATE",
-      [id]
-    );
+      await client.query("BEGIN");
 
-    if (!found.rows.length) {
-      await client.query("ROLLBACK");
-      return error(res, 404, "Withdrawal not found");
-    }
-
-    const withdrawal = found.rows[0];
-
-    if (withdrawal.status !== "pending") {
-      await client.query("ROLLBACK");
-      return error(res, 409, "This withdrawal has already been processed");
-    }
-
-    const newStatus = action === "approve" ? "approved" : "rejected";
-
-    await client.query(
-      `UPDATE withdrawals
-       SET status = $1, admin_note = $2, updated_at = NOW()
-       WHERE id = $3`,
-      [newStatus, note, id]
-    );
-
-    if (action === "reject") {
-      await clien
+      c
