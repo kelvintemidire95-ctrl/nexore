@@ -28,10 +28,13 @@ app.set("trust proxy", 1);
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Use a new, unique session table name.
+const SESSION_TABLE = "nexore_sessions";
+
 const sessionStore = new PgSession({
   pool,
-  tableName: "user_sessions",
-  createTableIfMissing: true
+  tableName: SESSION_TABLE,
+  createTableIfMissing: false
 });
 
 app.use(
@@ -52,6 +55,20 @@ app.use(
 );
 
 async function initDB() {
+  // Create the session table ourselves before accepting requests.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nexore_sessions (
+      sid VARCHAR NOT NULL PRIMARY KEY,
+      sess JSON NOT NULL,
+      expire TIMESTAMP(6) NOT NULL
+    )
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS nexore_sessions_expire_idx
+    ON nexore_sessions (expire)
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGSERIAL PRIMARY KEY,
@@ -72,7 +89,7 @@ async function initDB() {
     ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()
   `);
 
-  // Make old password column optional if it exists.
+  // Make an old password column optional if it exists.
   await pool.query(`
     DO $$
     BEGIN
@@ -209,7 +226,11 @@ app.post("/api/register", async (req, res) => {
       await saveSession(req);
     } catch (error) {
       console.error("REGISTER SESSION ERROR:", error);
-      return sendError(res, 500, "Account created, but login session failed. Please log in.");
+      return sendError(
+        res,
+        500,
+        "Account created, but login session failed. Please log in."
+      );
     }
 
     res.status(201).json({
@@ -239,7 +260,11 @@ app.post("/api/login", async (req, res) => {
     const password = String(req.body.password || "");
 
     if (!login || !password) {
-      return sendError(res, 400, "Email/username and password are required");
+      return sendError(
+        res,
+        400,
+        "Email/username and password are required"
+      );
     }
 
     const result = await pool.query(
@@ -258,7 +283,11 @@ app.post("/api/login", async (req, res) => {
     const user = result.rows[0];
 
     if (!user.password_hash) {
-      return sendError(res, 401, "This account has no saved password. Please register again.");
+      return sendError(
+        res,
+        401,
+        "This account has no saved password. Please register again."
+      );
     }
 
     const validPassword = await bcrypt.compare(
@@ -318,7 +347,6 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Serve other public files after the explicit routes.
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use((error, req, res, next) => {
