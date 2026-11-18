@@ -13,6 +13,10 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET environment variable is required");
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === "production"
@@ -28,7 +32,7 @@ app.use(session({
     pool,
     createTableIfMissing: true
   }),
-  secret: process.env.SESSION_SECRET || "change-this-secret-before-launch",
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -64,10 +68,11 @@ function page(title, content, user = null) {
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#080d18;color:#f4f5f7;font-family:Arial,sans-serif}
-header{padding:20px 6%;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222b3c}
-.logo{font-size:25px;font-weight:900;letter-spacing:3px;color:#e5b94f}
-nav a{color:#ddd;text-decoration:none;margin-left:15px;font-size:14px}
-main{max-width:1100px;margin:35px auto;padding:0 18px}
+header{padding:20px 6%;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #222b3c;flex-wrap:wrap;gap:15px}
+.logo{font-size:25px;font-weight:900;letter-spacing:3px;color:#e5b94f;text-decoration:none}
+nav{display:flex;flex-wrap:wrap;gap:14px}
+nav a{color:#ddd;text-decoration:none;font-size:14px}
+main{max-width:1100px;margin:35px auto;padding:0 18px;min-height:70vh}
 h1,h2{color:#f1c65c}
 p{color:#b9c0ce;line-height:1.6}
 .hero{padding:55px 25px;background:linear-gradient(135deg,#151f34,#0c1321);border:1px solid #303b50;border-radius:18px;text-align:center}
@@ -76,7 +81,7 @@ p{color:#b9c0ce;line-height:1.6}
 .btn.secondary{background:#202c40;color:#fff}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin:22px 0}
 .card{background:#111a2a;border:1px solid #27344a;border-radius:13px;padding:20px;margin:14px 0}
-.stat{font-size:25px;font-weight:bold;color:#f1c65c;margin-top:10px}
+.stat{font-size:25px;font-weight:bold;color:#f1c65c;margin-top:10px;overflow-wrap:anywhere}
 input,select,textarea{width:100%;padding:13px;margin:8px 0 15px;border:1px solid #34425a;border-radius:8px;background:#0b1220;color:white}
 label{color:#cbd2df;font-size:14px}
 form{max-width:520px}
@@ -100,6 +105,8 @@ ${user ? `
 <a href="/dashboard">Dashboard</a>
 <a href="/campaigns">Campaigns</a>
 <a href="/wallet">Wallet</a>
+<a href="/history">History</a>
+${user.is_admin ? '<a href="/admin">Admin</a>' : ""}
 <a href="/logout">Logout</a>
 ` : `
 <a href="/login">Login</a>
@@ -118,17 +125,17 @@ function message(text, type = "notice") {
 }
 
 function requireAuth(req, res, next) {
-  if (!req.session.user) {
-    return res.redirect("/login");
-  }
+  if (!req.session.user) return res.redirect("/login");
   next();
 }
 
 function requireAdmin(req, res, next) {
   if (!req.session.user || !req.session.user.is_admin) {
-    return res.status(403).send(page("Access denied",
+    return res.status(403).send(page(
+      "Access denied",
       "<h1>Access denied</h1><p>Administrator access is required.</p>",
-      req.session.user));
+      req.session.user
+    ));
   }
   next();
 }
@@ -179,28 +186,30 @@ async function initDatabase() {
   const adminEmail = process.env.ADMIN_EMAIL;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (adminEmail && adminPassword) {
-    const existing = await pool.query(
-      "SELECT id FROM users WHERE LOWER(email)=LOWER($1)",
+  if (!adminEmail || !adminPassword) {
+    console.warn("ADMIN_EMAIL or ADMIN_PASSWORD is missing. Admin account not configured.");
+    return;
+  }
+
+  const existing = await pool.query(
+    "SELECT id FROM users WHERE LOWER(email)=LOWER($1)",
+    [adminEmail]
+  );
+
+  if (!existing.rowCount) {
+    const hashed = await bcrypt.hash(adminPassword, 12);
+    const code = crypto.randomBytes(5).toString("hex").toUpperCase();
+
+    await pool.query(
+      `INSERT INTO users(name,email,password,referral_code,is_admin)
+       VALUES($1,$2,$3,$4,TRUE)`,
+      ["NEXORE Admin", adminEmail.toLowerCase(), hashed, code]
+    );
+  } else {
+    await pool.query(
+      "UPDATE users SET is_admin=TRUE WHERE LOWER(email)=LOWER($1)",
       [adminEmail]
     );
-
-    if (!existing.rowCount) {
-      const hashed = await bcrypt.hash(adminPassword, 12);
-      const code = crypto.randomBytes(5).toString("hex").toUpperCase();
-
-      await pool.query(
-        `INSERT INTO users
-        (name,email,password,referral_code,is_admin)
-        VALUES($1,$2,$3,$4,TRUE)`,
-        ["NEXORE Admin", adminEmail.toLowerCase(), hashed, code]
-      );
-    } else {
-      await pool.query(
-        "UPDATE users SET is_admin=TRUE WHERE LOWER(email)=LOWER($1)",
-        [adminEmail]
-      );
-    }
   }
 }
 
@@ -219,7 +228,7 @@ app.get("/", (req, res) => {
       <a class="btn" href="${user ? "/dashboard" : "/register"}">
         ${user ? "Open Dashboard" : "Get Started"}
       </a>
-      <a class="btn secondary" href="/campaigns">Explore Campaigns</a>
+      <a class="btn secondary" href="${user ? "/campaigns" : "/login"}">Explore Campaigns</a>
     </section>
     <div class="grid">
       <div class="card"><h2>Affiliate Links</h2><p>Get your own referral link and share it with your audience.</p></div>
@@ -263,7 +272,7 @@ app.post("/register", async (req, res) => {
 
     if (!name || !email || password.length < 8) {
       return res.redirect("/register?error=" +
-        encodeURIComponent("Enter your name, a valid email and a password of at least 8 characters."));
+        encodeURIComponent("Enter your name, valid email and password of at least 8 characters."));
     }
 
     const existing = await pool.query(
@@ -296,12 +305,17 @@ app.post("/register", async (req, res) => {
       [name, email, hashed, code, referrerId]
     );
 
-    req.session.user = result.rows[0];
-    res.redirect("/dashboard");
+    req.session.regenerate(error => {
+      if (error) return res.status(500).send("Session error");
+      req.session.user = result.rows[0];
+      res.redirect("/dashboard");
+    });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).send(page("Registration error",
-      "<h1>Could not create your account</h1><p>Please try again.</p>"));
+    res.status(500).send(page(
+      "Registration error",
+      "<h1>Could not create your account</h1><p>Please try again.</p>"
+    ));
   }
 });
 
@@ -342,6 +356,7 @@ app.post("/login", async (req, res) => {
 
     const user = result.rows[0];
     delete user.password;
+
     req.session.regenerate(error => {
       if (error) return res.status(500).send("Session error");
       req.session.user = user;
@@ -364,15 +379,21 @@ app.get("/dashboard", requireAuth, async (req, res) => {
     await Promise.all([
       pool.query("SELECT * FROM users WHERE id=$1", [userId]),
       pool.query("SELECT COUNT(*) FROM users WHERE referred_by=$1", [userId]),
-      pool.query("SELECT COALESCE(SUM(amount),0) AS total FROM commissions WHERE user_id=$1 AND status='approved'", [userId]),
-      pool.query("SELECT COUNT(*) FROM withdrawals WHERE user_id=$1 AND status='pending'", [userId])
+      pool.query(
+        "SELECT COALESCE(SUM(amount),0) AS total FROM commissions WHERE user_id=$1 AND status='approved'",
+        [userId]
+      ),
+      pool.query(
+        "SELECT COUNT(*) FROM withdrawals WHERE user_id=$1 AND status='pending'",
+        [userId]
+      )
     ]);
 
   const user = userResult.rows[0];
   const referralCount = referralResult.rows[0].count;
   const totalCommission = commissionResult.rows[0].total;
   const pendingWithdrawals = withdrawalResult.rows[0].count;
-  const referralLink = `${req.protocol}://${req.get("host")}/register?ref=${user.referral_code}`;
+  const referralLink = `${req.protocol}://${req.get("host")}/register?ref=${encodeURIComponent(user.referral_code)}`;
 
   res.send(page("Dashboard", `
     <h1>Welcome, ${escapeHTML(user.name)}</h1>
@@ -385,7 +406,7 @@ app.get("/dashboard", requireAuth, async (req, res) => {
     <div class="card">
       <h2>Your Referral Link</h2>
       <input id="refLink" readonly value="${escapeHTML(referralLink)}">
-      <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('refLink').value).then(()=>alert('Referral link copied'))">Copy Link</button>
+      <button class="btn" onclick="navigator.clipboard.writeText(document.getElementById('refLink').value).then(()=>alert('Referral link copied')).catch(()=>alert('Copy failed'))">Copy Link</button>
       <p class="small">Share this link. Referrals do not automatically generate commissions; eligible activity must be reviewed and approved.</p>
     </div>
     <div class="grid">
@@ -491,6 +512,7 @@ app.post("/withdraw", requireAuth, async (req, res) => {
     );
 
     await client.query("COMMIT");
+
     res.redirect("/wallet?success=" +
       encodeURIComponent("Withdrawal request submitted for admin review."));
   } catch (error) {
@@ -550,26 +572,11 @@ app.get("/history", requireAuth, async (req, res) => {
 
 app.get("/admin", requireAuth, requireAdmin, async (req, res) => {
   const [users, campaigns, withdrawals] = await Promise.all([
-    pool.query("SELECT id,name,email,balance,referral_code,created_at FROM users ORDER BY created_at DESC LIMIT 100"),
+    pool.query(
+      "SELECT id,name,email,balance,referral_code,created_at FROM users ORDER BY created_at DESC LIMIT 100"
+    ),
     pool.query("SELECT * FROM campaigns ORDER BY created_at DESC"),
     pool.query(
       `SELECT w.*,u.name,u.email FROM withdrawals w
-       JOIN users u ON u.id=w.user_id ORDER BY w.created_at DESC LIMIT 100`
-    )
-  ]);
-
-  const userRows = users.rows.map(u => `
-    <tr>
-      <td>${u.id}</td><td>${escapeHTML(u.name)}</td>
-      <td>${escapeHTML(u.email)}</td><td>${money(u.balance)}</td>
-      <td>${escapeHTML(u.referral_code)}</td>
-    </tr>
-  `).join("");
-
-  const campaignRows = campaigns.rows.map(c => `
-    <tr>
-      <td>${c.id}</td><td>${escapeHTML(c.title)}</td>
-      <td>${money(c.commission)}</td><td>${c.active ? "Active" : "Inactive"}</td>
-      <td>
-        <form method="POST" action="/admin/campaign-toggle">
-          <input type="hidden" name="id" value="${c.id}
+       JOIN users u ON u.id=w.user_id
+       ORDER BY w.created_
